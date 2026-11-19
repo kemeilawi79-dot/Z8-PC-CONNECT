@@ -1,6 +1,12 @@
-# Z8 PC CONNECT
+# Z8 PC CONNECT — Android Phone to Windows PC Remote Control
 
-Z8 PC CONNECT is a phone-to-Windows remote-control prototype for a trusted local network. The current Windows host and Android client are built from this repository.
+**Z8 PC CONNECT** is an Android-to-Windows companion app for controlling a Windows PC from an Android phone over a trusted local Wi-Fi network or USB-tethered network. It includes PC screen viewing and input, phone screen mirroring on the PC, file transfer, and two-way text/image clipboard tools.
+
+[**Download the latest release**](https://github.com/kemeilawi79-dot/Z8-PC-CONNECT/releases/latest) · [Source code](https://github.com/kemeilawi79-dot/Z8-PC-CONNECT) · [Release v1.0.0](https://github.com/kemeilawi79-dot/Z8-PC-CONNECT/releases/tag/v1.0.0)
+
+**Search terms:** Android PC remote control, control Windows PC from Android phone, phone to PC remote desktop over Wi-Fi, Android Windows screen control, PC screen mirror to phone, phone screen mirror to Windows, Android to Windows file transfer, clipboard sync between Android and Windows, LAN remote desktop, open-source Android Windows companion app.
+
+> **Project status:** This is an early LAN prototype, not a hardened public-internet remote desktop product. Both devices must be on a trusted local network. Do not expose its connection port to the internet.
 
 ## Windows host
 1. Install the .NET 8 Desktop Runtime.
