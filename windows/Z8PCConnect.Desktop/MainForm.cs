@@ -20,17 +20,17 @@ public sealed class MainForm : Form
     private readonly Label ips = new() { AutoSize = true, Font = new Font("Segoe UI", 13, FontStyle.Bold), ForeColor = Forest };
     private readonly Label pcName = new() { AutoSize = true, ForeColor = Ink, Font = new Font("Segoe UI", 10) };
     private readonly TextBox log = new() { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, BackColor = Deep, ForeColor = Sand, BorderStyle = BorderStyle.None, Dock = DockStyle.Fill, Font = new Font("Consolas", 9) };
-    private readonly Button start = new() { Text = "START CONNECTION", AutoSize = true };
-    private readonly Button stop = new() { Text = "STOP", AutoSize = true, Enabled = false };
-    private readonly Button copyIp = new() { Text = "COPY PC ADDRESS", AutoSize = true };
-    private readonly Button copyCode = new() { Text = "COPY PAIRING CODE", AutoSize = true };
+    private readonly Button start = new() { Text = "START", AutoSize = false, Size = new Size(120, 40) };
+    private readonly Button stop = new() { Text = "STOP", AutoSize = false, Size = new Size(80, 40), Enabled = false };
+    private readonly Button copyIp = new() { Text = "COPY IP", AutoSize = false, Size = new Size(110, 40) };
+    private readonly Button copyCode = new() { Text = "COPY CODE", AutoSize = false, Size = new Size(120, 40) };
     private readonly Button cast = new() { Text = "OPEN SEPARATE PHONE CAST", AutoSize = true };
     private readonly Button embedPhone = new() { Text = "OPEN IN-APP PHONE CONTROL", AutoSize = true };
     private readonly PictureBox phoneView = new() { Size = new Size(260, 470), BackColor = Color.Black, BorderStyle = BorderStyle.FixedSingle, SizeMode = PictureBoxSizeMode.Zoom, TabStop = true };
     private readonly System.Windows.Forms.Timer phoneRefresh = new() { Interval = 650 };
-    private readonly TextBox phoneText = new() { Size = new Size(600, 34), PlaceholderText = "Type text to send to the phone…" };
+    private readonly TextBox phoneText = new() { Size = new Size(450, 34), PlaceholderText = "Type text to send to the phone…" };
     private readonly Button sendPhoneText = new() { Text = "SEND TO PHONE", AutoSize = true };
-    private readonly Label transferSummary = new() { Text = "Files received from your phone will appear here.", Location = new Point(28, 58), Size = new Size(900, 42), ForeColor = Ink, Font = new Font("Segoe UI", 10) };
+    private readonly Label transferSummary = new() { Text = "Files received from your phone will appear here.", Location = new Point(28, 58), Size = new Size(720, 42), ForeColor = Ink, Font = new Font("Segoe UI", 10) };
     private readonly Button openDownloads = new() { Text = "OPEN LAPTOP DOWNLOADS", AutoSize = true };
     private string phoneSerial = "";
     private Point phoneDown;
@@ -47,10 +47,13 @@ public sealed class MainForm : Form
         Width = 1180; Height = 650; MinimumSize = new Size(1000, 560);
         BackColor = Deep; ForeColor = Ink;
         StartPosition = FormStartPosition.CenterScreen;
+        WindowState = FormWindowState.Maximized;
         Controls.Add(page);
-        page.SizeChanged += (_, _) => { var side = Math.Max(28, (page.ClientSize.Width - 980) / 2); page.Padding = new Padding(side, 24, side, 24); };
-        page.Padding = new Padding(28);
+        page.SizeChanged += (_, _) => { var logicalWidth = page.ClientSize.Width * 96f / page.DeviceDpi; var side = Math.Max(20, (int)((logicalWidth - 800) / 2)); page.Padding = new Padding(side, 16, side, 16); };
         BuildPage();
+        var logicalWidth = page.ClientSize.Width * 96f / page.DeviceDpi;
+        var side = Math.Max(20, (int)((logicalWidth - 800) / 2));
+        page.Padding = new Padding(side, 16, side, 16);
         refresh.Tick += async (_, _) => await RefreshStatus();
         phoneRefresh.Tick += async (_, _) => await RefreshPhoneFrame();
         Shown += async (_, _) => { await StartServer(); refresh.Start(); };
@@ -59,7 +62,7 @@ public sealed class MainForm : Form
 
     private void BuildPage()
     {
-        var hero = new Panel { Width = 980, Height = 120, BackColor = Deep, Margin = new Padding(0, 0, 0, 18) };
+        var hero = new Panel { Width = 800, Height = 120, BackColor = Deep, Margin = new Padding(0, 0, 0, 18) };
         hero.Paint += (_, e) =>
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
@@ -79,22 +82,22 @@ public sealed class MainForm : Form
             using var sub = new Font("Segoe UI", 10, FontStyle.Regular);
             using var white = new SolidBrush(Sand); using var cyan = new SolidBrush(Ice);
             e.Graphics.DrawString("Z8 PC CONNECT", title, white, 210, 25);
-            e.Graphics.DrawString("YOUR PC. IN YOUR HANDS.   •   CONNECT  /  CONTROL  /  ACCESS", sub, cyan, 214, 67);
+            e.Graphics.DrawString("REMOTE DESKTOP  •  PHONE CAST  •  FILE TRANSFER", sub, cyan, 214, 67);
         };
         page.Controls.Add(hero);
 
-        var connection = MakeCard(980, 300);
+        var connection = MakeCard(800, 300);
         connection.Controls.Add(MakeHeading("PC CONNECTION"));
         state.Text = "Starting connection service…";
         state.Location = new Point(28, 62);
         pcName.Text = "This laptop"; pcName.Location = new Point(28, 92);
         var ipLabel = MakeSmall("PC ADDRESS  ·  PORT 8765", 28, 130);
         ips.Location = new Point(28, 154); ips.Text = "Finding active network…";
-        code.Location = new Point(550, 145); code.Text = "------";
-        var codeLabel = MakeSmall("PAIRING CODE  ·  ENTER THIS ON YOUR PHONE", 550, 116);
+        code.Location = new Point(530, 125); code.Text = "------";
+        var codeLabel = MakeSmall("PAIRING CODE", 530, 100);
         Style(start); Style(stop); Style(copyIp); Style(copyCode);
-        start.Location = new Point(28, 232); stop.Location = new Point(245, 232);
-        copyIp.Location = new Point(330, 232); copyCode.Location = new Point(520, 232);
+        start.Location = new Point(28, 200); stop.Location = new Point(162, 200);
+        copyIp.Location = new Point(252, 200); copyCode.Location = new Point(374, 200);
         start.Click += async (_, _) => await StartServer();
         stop.Click += (_, _) => StopServer();
         copyIp.Click += (_, _) => { if (!string.IsNullOrWhiteSpace(ips.Text)) Clipboard.SetText(ips.Text.Split(' ')[0]); };
@@ -102,7 +105,7 @@ public sealed class MainForm : Form
         connection.Controls.AddRange([state, pcName, ipLabel, ips, codeLabel, code, start, stop, copyIp, copyCode]);
         page.Controls.Add(connection);
 
-        var guide = MakeCard(980, 225);
+        var guide = MakeCard(800, 225);
         guide.Controls.Add(MakeHeading("CONNECT YOUR ANDROID PHONE"));
         AddGuide(guide, "1", "On your phone, open Google Play, search for Z8 PC CONNECT, and install the app when it is published.");
         AddGuide(guide, "2", "Open this Windows app. Keep it running and note the PC address and six-digit pairing code above.");
@@ -110,24 +113,24 @@ public sealed class MainForm : Form
         AddGuide(guide, "4", "Tap Pair and Connect. The live PC desktop will appear on your phone; rotate to landscape for the full-screen view.");
         page.Controls.Add(guide);
 
-        var phone = MakeCard(980, 540);
+        var phone = MakeCard(800, 540);
         phone.Controls.Add(MakeHeading("PHONE SCREEN · IN-APP CONTROL"));
         phoneView.Location = new Point(28, 58);
         phoneView.MouseDown += (_, e) => { phoneDown = e.Location; phoneView.Focus(); };
         phoneView.MouseUp += (_, e) => { var a = MapPhonePoint(phoneDown); var b = MapPhonePoint(e.Location); if (Math.Abs(e.X-phoneDown.X)+Math.Abs(e.Y-phoneDown.Y) < 12) SendPhoneShell("shell","input","tap",a.X.ToString(),a.Y.ToString()); else SendPhoneShell("shell","input","swipe",a.X.ToString(),a.Y.ToString(),b.X.ToString(),b.Y.ToString(),"350"); };
         phoneView.MouseWheel += (_, e) => { var p = MapPhonePoint(new Point(phoneView.Width/2, phoneView.Height/2)); var endY = Math.Clamp(p.Y + (e.Delta > 0 ? 260 : -260), 0, phoneView.Image?.Height ?? 1000); SendPhoneShell("shell","input","swipe",p.X.ToString(),p.Y.ToString(),p.X.ToString(),endY.ToString(),"250"); };
         phoneView.KeyPress += (_, e) => { if (!char.IsControl(e.KeyChar)) SendPhoneTextToDevice(e.KeyChar.ToString()); };
-        Style(sendPhoneText); sendPhoneText.Location = new Point(330, 390); sendPhoneText.Click += (_, _) => SendPhoneTextToDevice(phoneText.Text);
-        phoneText.Location = new Point(330, 340); phoneText.ForeColor = Forest;
-        var phoneInfo = new Label { Text = "Connect your Android phone by USB or Wi-Fi ADB. Click the live preview to tap, drag to swipe, use the mouse wheel to scroll, or type after focusing the preview. The separate cast button opens a full independent phone window.", Location = new Point(330, 70), Size = new Size(600, 110), ForeColor = Ink, Font = new Font("Segoe UI", 11) };
-        Style(embedPhone); embedPhone.Location = new Point(330, 205);
-        Style(cast); cast.Location = new Point(330, 265);
+        Style(sendPhoneText); sendPhoneText.Location = new Point(310, 390); sendPhoneText.Click += (_, _) => SendPhoneTextToDevice(phoneText.Text);
+        phoneText.Location = new Point(310, 340); phoneText.ForeColor = Forest;
+        var phoneInfo = new Label { Text = "Connect your Android phone by USB or Wi-Fi ADB. Click the live preview to tap, drag to swipe, use the mouse wheel to scroll, or type after focusing the preview. The separate cast button opens a full independent phone window.", Location = new Point(310, 70), Size = new Size(450, 110), ForeColor = Ink, Font = new Font("Segoe UI", 11) };
+        Style(embedPhone); embedPhone.Location = new Point(310, 205);
+        Style(cast); cast.Location = new Point(310, 265);
         embedPhone.Click += async (_, _) => await StartPhonePreview();
         cast.Click += (_, _) => LaunchPhoneCast();
         phone.Controls.AddRange([phoneView, phoneInfo, embedPhone, cast, phoneText, sendPhoneText]);
         page.Controls.Add(phone);
 
-        var transfers = MakeCard(980, 155);
+        var transfers = MakeCard(800, 155);
         transfers.Controls.Add(MakeHeading("PHONE → PC FILE TRANSFERS"));
         Style(openDownloads); openDownloads.Location = new Point(28, 105);
         openDownloads.Click += (_, _) => {
@@ -139,9 +142,9 @@ public sealed class MainForm : Form
         transfers.Controls.Add(openDownloads);
         page.Controls.Add(transfers);
 
-        var logCard = MakeCard(980, 170);
+        var logCard = MakeCard(800, 170);
         logCard.Controls.Add(MakeHeading("LIVE CONNECTION ACTIVITY"));
-        var logPanel = new Panel { Location = new Point(22, 54), Size = new Size(930, 94), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, BackColor = Deep, Padding = new Padding(10) };
+        var logPanel = new Panel { Location = new Point(22, 54), Size = new Size(750, 94), Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right, BackColor = Deep, Padding = new Padding(10) };
         logPanel.Controls.Add(log); logCard.Controls.Add(logPanel);
         page.Controls.Add(logCard);
     }
@@ -153,7 +156,7 @@ public sealed class MainForm : Form
     {
         var y = 58 + (int.Parse(n) - 1) * 38;
         var badge = new Label { Text = n, Location = new Point(28, y), Size = new Size(24, 24), TextAlign = ContentAlignment.MiddleCenter, BackColor = Forest, ForeColor = Sand, Font = new Font("Segoe UI", 9, FontStyle.Bold) };
-        var label = new Label { Text = text, Location = new Point(66, y + 2), Size = new Size(880, 34), AutoSize = false, AutoEllipsis = false, ForeColor = Ink, Font = new Font("Segoe UI", 9.5f) };
+        var label = new Label { Text = text, Location = new Point(66, y + 2), Size = new Size(660, 34), AutoSize = false, AutoEllipsis = false, ForeColor = Ink, Font = new Font("Segoe UI", 9.5f) };
         panel.Controls.AddRange([badge, label]);
     }
     private static void Style(Button b)
