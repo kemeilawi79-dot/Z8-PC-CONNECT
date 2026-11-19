@@ -21,9 +21,9 @@ public sealed class MainForm : Form
     private readonly Label pcName = new() { AutoSize = true, ForeColor = Ink, Font = new Font("Segoe UI", 10) };
     private readonly TextBox log = new() { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, BackColor = Deep, ForeColor = Sand, BorderStyle = BorderStyle.None, Dock = DockStyle.Fill, Font = new Font("Consolas", 9) };
     private readonly Button start = new() { Text = "START", AutoSize = false, Size = new Size(120, 40) };
-    private readonly Button stop = new() { Text = "STOP", AutoSize = false, Size = new Size(80, 40), Enabled = false };
-    private readonly Button copyIp = new() { Text = "COPY IP", AutoSize = false, Size = new Size(110, 40) };
-    private readonly Button copyCode = new() { Text = "COPY CODE", AutoSize = false, Size = new Size(120, 40) };
+    private readonly Button stop = new() { Text = "STOP", AutoSize = false, Size = new Size(110, 40), Enabled = false };
+    private readonly Button copyIp = new() { Text = "COPY IP", AutoSize = false, Size = new Size(150, 40) };
+    private readonly Button copyCode = new() { Text = "COPY CODE", AutoSize = false, Size = new Size(150, 40) };
     private readonly Button cast = new() { Text = "OPEN SEPARATE PHONE CAST", AutoSize = true };
     private readonly Button embedPhone = new() { Text = "OPEN IN-APP PHONE CONTROL", AutoSize = true };
     private readonly PictureBox phoneView = new() { Size = new Size(260, 470), BackColor = Color.Black, BorderStyle = BorderStyle.FixedSingle, SizeMode = PictureBoxSizeMode.Zoom, TabStop = true };
@@ -97,7 +97,7 @@ public sealed class MainForm : Form
         var codeLabel = MakeSmall("PAIRING CODE", 530, 100);
         Style(start); Style(stop); Style(copyIp); Style(copyCode);
         start.Location = new Point(28, 200); stop.Location = new Point(162, 200);
-        copyIp.Location = new Point(252, 200); copyCode.Location = new Point(374, 200);
+        copyIp.Location = new Point(285, 200); copyCode.Location = new Point(448, 200);
         start.Click += async (_, _) => await StartServer();
         stop.Click += (_, _) => StopServer();
         copyIp.Click += (_, _) => { if (!string.IsNullOrWhiteSpace(ips.Text)) Clipboard.SetText(ips.Text.Split(' ')[0]); };
