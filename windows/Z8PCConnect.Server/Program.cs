@@ -109,6 +109,16 @@ static void HandleInput(JsonElement e) {
         var vk=(ushort)e.GetProperty("keyCode").GetInt32();
         Native.keybd_event((byte)vk,0,0,UIntPtr.Zero); Native.keybd_event((byte)vk,0,2,UIntPtr.Zero);
     }
+    else if (type == "keyCombo") {
+        var keys = e.GetProperty("keys").EnumerateArray().Select(x => (byte)x.GetInt32()).ToArray();
+        if (keys.Length > 0) {
+            foreach (var modifier in keys.Take(keys.Length - 1)) Native.keybd_event(modifier,0,0,UIntPtr.Zero);
+            var last = keys[^1];
+            Native.keybd_event(last,0,0,UIntPtr.Zero);
+            Native.keybd_event(last,0,2,UIntPtr.Zero);
+            foreach (var modifier in keys.Take(keys.Length - 1).Reverse()) Native.keybd_event(modifier,0,2,UIntPtr.Zero);
+        }
+    }
     else if (type == "text") {
         foreach (char c in e.GetProperty("text").GetString() ?? "") {
             var mapped=Native.VkKeyScan(c);
