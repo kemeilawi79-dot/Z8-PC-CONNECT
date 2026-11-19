@@ -50,6 +50,22 @@ app.MapPost("/clipboard", (ClipboardRequest body, HttpRequest req) => {
     if (!Authorized(req, tokens, gate)) return Results.Unauthorized();
     try { SetClipboard(body.Text ?? ""); return Results.Ok(new { saved = true }); } catch { return Results.Problem("Clipboard unavailable"); }
 });
+app.MapGet("/clipboard/image", (HttpRequest req) => {
+    if (!Authorized(req, tokens, gate)) return Results.Unauthorized();
+    try {
+        var image = ReadClipboardImage();
+        return image == null ? Results.NotFound(new { error = "No image is on the PC clipboard." }) : Results.File(image, "image/png", "z8-pc-clipboard.png");
+    } catch { return Results.Problem("Could not read the PC image clipboard."); }
+});
+app.MapPost("/clipboard/image", async (HttpRequest req) => {
+    if (!Authorized(req, tokens, gate)) return Results.Unauthorized();
+    if (req.ContentLength is > 25000000) return Results.BadRequest(new { error = "Clipboard image exceeds 25 MB." });
+    using var buffer = new MemoryStream();
+    await req.Body.CopyToAsync(buffer);
+    if (buffer.Length < 8 || buffer.Length > 25000000) return Results.BadRequest(new { error = "Invalid or oversized image." });
+    try { SetClipboardImage(buffer.ToArray()); return Results.Ok(new { saved = true, bytes = buffer.Length }); }
+    catch { return Results.Problem("Could not write the PC image clipboard."); }
+});
 app.MapPost("/files/upload", async (HttpRequest req) => {
     if (!Authorized(req, tokens, gate)) return Results.Unauthorized();
     var name = Path.GetFileName(req.Query["name"].ToString());
@@ -183,6 +199,28 @@ static void HandleInput(JsonElement e) {
 }
 static string ReadClipboard() { string value=""; var t=new Thread(()=> { if(Clipboard.ContainsText()) value=Clipboard.GetText(); }); t.SetApartmentState(ApartmentState.STA); t.Start(); t.Join(); return value; }
 static void SetClipboard(string value) { var t=new Thread(()=>Clipboard.SetText(value)); t.SetApartmentState(ApartmentState.STA); t.Start(); t.Join(); }
+static byte[]? ReadClipboardImage() {
+    byte[]? value = null;
+    var t = new Thread(() => {
+        if (Clipboard.ContainsImage()) {
+            using var image = Clipboard.GetImage();
+            if (image != null) {
+                using var ms = new MemoryStream();
+                image.Save(ms, ImageFormat.Png);
+                value = ms.ToArray();
+            }
+        }
+    });
+    t.SetApartmentState(ApartmentState.STA); t.Start(); t.Join();
+    return value;
+}
+static void SetClipboardImage(byte[] bytes) {
+    using var ms = new MemoryStream(bytes);
+    using var source = new Bitmap(ms);
+    using var copy = new Bitmap(source);
+    var t = new Thread(() => Clipboard.SetImage(copy));
+    t.SetApartmentState(ApartmentState.STA); t.Start(); t.Join();
+}
 static class Native {
     [DllImport("user32.dll")] public static extern bool SetCursorPos(int X,int Y);
     [DllImport("user32.dll")] public static extern void mouse_event(uint flags,uint dx,uint dy,int data,UIntPtr extra);

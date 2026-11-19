@@ -20,10 +20,13 @@ Install `Z8_PC_CONNECT_Android.apk` (the current package is a debug-signed test 
 - Read the PC text clipboard or copy phone text to the PC clipboard.
 
 ## Phone screen on the PC
-The Windows package bundles the Android Debug Bridge and official scrcpy Windows tools. Authorize USB debugging or connect ADB over Wi-Fi. In the PC app, **OPEN IN-APP PHONE CONTROL** shows a phone preview inside its card; click/tap, drag/swipe, use the mouse wheel to scroll, or type after focusing the preview. **OPEN SEPARATE PHONE CAST** launches a separate scrcpy window. The embedded preview uses ADB screenshots and is less fluid than the separate scrcpy cast.
+The Windows package bundles the Android Debug Bridge and official scrcpy Windows tools. Authorize USB debugging or connect ADB over Wi-Fi. If both USB and Wi-Fi ADB are available, the PC app prefers the Wi-Fi ADB device for the in-app preview. In the PC app, **OPEN IN-APP PHONE CONTROL** shows a live phone preview inside its card; click/tap, drag/swipe, use the mouse wheel to scroll, or type after focusing the preview. **OPEN SEPARATE PHONE CAST** launches a separate scrcpy window. The embedded preview uses periodic ADB screenshots and is less fluid than the separate scrcpy cast.
 
 ## File transfer
-On the phone's Files page, choose **Downloads**, **Desktop**, or **Documents**, then select a file. Photos, videos, APKs, music, documents, and other files are uploaded to the selected PC folder. Existing files are not overwritten; duplicate names receive a numbered suffix. The PC app lists recent incoming transfers and has a shortcut to the laptop Downloads folder.
+On the phone's Files page, choose **Downloads**, **Desktop**, or **Documents**, then select a file. Photos, videos, APKs, music, documents, and other files are streamed to the selected PC folder. Existing files are not overwritten; duplicate names receive a numbered suffix. The PC app lists recent incoming transfers and has a shortcut to the laptop Downloads folder.
+
+## Clipboard sync
+Text clipboard sync works in both directions. For images, copy an image in a phone app first, then tap **SEND PHONE IMAGE TO PC**; to transfer a screenshot from Windows, use Snipping Tool or Print Screen to copy it to the PC clipboard, then tap **COPY PC IMAGE TO PHONE**. The received PC image is saved in Pictures/Z8 PC CONNECT and placed on the Android clipboard.
 
 ## Tutorials and screenshots
 The Android Tutorial page explains installation, pairing, landscape PC control, and the in-app phone preview. It includes screenshots of the phone client, full-screen PC view, and embedded phone preview. Google Play instructions are shown in the Windows app; the phone tutorial is for the GitHub release and setup flow.

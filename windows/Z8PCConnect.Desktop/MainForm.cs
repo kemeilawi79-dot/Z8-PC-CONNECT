@@ -27,7 +27,7 @@ public sealed class MainForm : Form
     private readonly Button cast = new() { Text = "OPEN SEPARATE PHONE CAST", AutoSize = true };
     private readonly Button embedPhone = new() { Text = "OPEN IN-APP PHONE CONTROL", AutoSize = true };
     private readonly PictureBox phoneView = new() { Size = new Size(260, 470), BackColor = Color.Black, BorderStyle = BorderStyle.FixedSingle, SizeMode = PictureBoxSizeMode.Zoom, TabStop = true };
-    private readonly System.Windows.Forms.Timer phoneRefresh = new() { Interval = 650 };
+    private readonly System.Windows.Forms.Timer phoneRefresh = new() { Interval = 850 };
     private readonly TextBox phoneText = new() { Size = new Size(450, 34), PlaceholderText = "Type text to send to the phone…" };
     private readonly Button sendPhoneText = new() { Text = "SEND TO PHONE", AutoSize = true };
     private readonly Label transferSummary = new() { Text = "Files received from your phone will appear here.", Location = new Point(28, 58), Size = new Size(720, 42), ForeColor = Ink, Font = new Font("Segoe UI", 10) };
@@ -56,7 +56,7 @@ public sealed class MainForm : Form
         page.Padding = new Padding(side, 16, side, 16);
         refresh.Tick += async (_, _) => await RefreshStatus();
         phoneRefresh.Tick += async (_, _) => await RefreshPhoneFrame();
-        Shown += async (_, _) => { await StartServer(); refresh.Start(); };
+        Shown += async (_, _) => { page.AutoScrollPosition = Point.Empty; await StartServer(); refresh.Start(); };
         FormClosing += (_, _) => { refresh.Stop(); phoneRefresh.Stop(); StopServer(); phoneView.Image?.Dispose(); http.Dispose(); };
     }
 
@@ -245,7 +245,7 @@ public sealed class MainForm : Form
             .Select(line => line.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
             .Where(parts => parts.Length >= 2 && parts[1] == "device")
             .Select(parts => parts[0]).ToArray();
-        return devices.FirstOrDefault(value => !value!.Contains(":")) ?? devices.FirstOrDefault() ?? "";
+        return devices.FirstOrDefault(value => value!.Contains(":")) ?? devices.FirstOrDefault() ?? "";
     }
 
     private async Task LaunchEmbeddedPhone()
@@ -352,7 +352,7 @@ public sealed class MainForm : Form
     {
         var adb = FindAdb();
         if (adb == null) return null;
-        var psi = new ProcessStartInfo(adb) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true, WorkingDirectory = Path.GetDirectoryName(adb)! };
+        var psi = new ProcessStartInfo(adb) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = false, CreateNoWindow = true, WorkingDirectory = Path.GetDirectoryName(adb)! };
         foreach (var arg in new[] { "-s", phoneSerial, "exec-out", "screencap", "-p" }) psi.ArgumentList.Add(arg);
         DebugPhone("starting adb screencap");
         using var proc = Process.Start(psi);
@@ -417,7 +417,7 @@ public sealed class MainForm : Form
                     .Select(line => line.Trim().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
                     .Where(parts => parts.Length >= 2 && parts[1] == "device")
                     .Select(parts => parts[0]).ToArray();
-                serial = devices.FirstOrDefault(value => !value!.Contains(":")) ?? devices.FirstOrDefault() ?? "";
+                serial = devices.FirstOrDefault(value => value!.Contains(":")) ?? devices.FirstOrDefault() ?? "";
             }
             var args = (string.IsNullOrWhiteSpace(serial) ? "" : "-s \"" + serial + "\" ") + "--window-title \"Z8 Phone Cast\" --always-on-top";
             Process.Start(new ProcessStartInfo(scrcpy, args) { UseShellExecute = true, WorkingDirectory = folder });

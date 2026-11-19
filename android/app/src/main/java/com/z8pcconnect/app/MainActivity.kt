@@ -28,6 +28,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.alpha
@@ -189,26 +192,7 @@ private fun Z8Home() {
                                 Image(
                                     bitmap=frame.asImageBitmap(), contentDescription="Entire laptop display",
                                     contentScale=ContentScale.Fit,
-                                    modifier=Modifier.size(drawWidth, drawHeight).pointerInput(frame) {
-                                        detectTapGestures(onTap={p ->
-                                            command(JSONObject().put("type","move").put("x",(p.x/size.width*frame.width).toInt()).put("y",(p.y/size.height*frame.height).toInt()))
-                                            command(JSONObject().put("type","click"))
-                                        },onLongPress={command(JSONObject().put("type","rightClick"))})
-                                    }.pointerInput(frame) {
-                                        detectDragGestures(
-                                            onDragStart={ command(JSONObject().put("type","mouseDown")) },
-                                            onDragEnd={ command(JSONObject().put("type","mouseUp")) },
-                                            onDragCancel={ command(JSONObject().put("type","mouseUp")) }
-                                        ) { change,_ ->
-                                            change.consume()
-                                            command(JSONObject().put("type","move").put("x",(change.position.x/size.width*frame.width).toInt()).put("y",(change.position.y/size.height*frame.height).toInt()))
-                                        }
-                                    }.pointerInput(frame) {
-                                        detectVerticalDragGestures { change,drag ->
-                                            change.consume()
-                                            command(JSONObject().put("type","scroll").put("delta",(-drag*8).toInt()))
-                                        }
-                                    }
+                                    modifier=Modifier.size(drawWidth, drawHeight).remoteDesktopControl(frame) { command(it) }
                                 )
                             } else {
                                 Text("Waiting for the PC desktop…", color=Sand)
@@ -227,27 +211,7 @@ private fun Z8Home() {
                                     Image(
                                         bitmap=screen!!.asImageBitmap(), contentDescription="Entire PC desktop",
                                         contentScale=ContentScale.Fit,
-                                        modifier=Modifier.fillMaxWidth().pointerInput(screen) {
-                                            detectTapGestures(onTap={p ->
-                                                val b=screen!!
-                                                command(JSONObject().put("type","move").put("x",(p.x/size.width*b.width).toInt()).put("y",(p.y/size.height*b.height).toInt()))
-                                                command(JSONObject().put("type","click"))
-                                            },onLongPress={command(JSONObject().put("type","rightClick"))})
-                                        }.pointerInput(screen) {
-                                            detectDragGestures(
-                                                onDragStart={command(JSONObject().put("type","mouseDown"))},
-                                                onDragEnd={command(JSONObject().put("type","mouseUp"))},
-                                                onDragCancel={command(JSONObject().put("type","mouseUp"))}
-                                            ) { change,_ ->
-                                                change.consume(); val b=screen!!
-                                                command(JSONObject().put("type","move").put("x",(change.position.x/size.width*b.width).toInt()).put("y",(change.position.y/size.height*b.height).toInt()))
-                                            }
-                                        }.pointerInput(screen) {
-                                            detectVerticalDragGestures { change,drag ->
-                                                change.consume()
-                                                command(JSONObject().put("type","scroll").put("delta",(-drag*7).toInt()))
-                                            }
-                                        }
+                                        modifier=Modifier.fillMaxWidth().remoteDesktopControl(screen!!) { command(it) }
                                     )
                                 }
                                 Text("Full desktop fitted to the phone · tap to click · drag to move · swipe vertically to scroll · long-press for right-click",color=Ink,fontSize=12.sp)
@@ -282,7 +246,7 @@ private fun Z8Home() {
                     item {
                         Z8Card {
                             Text("PC CLIPBOARD",color=Forest,fontWeight=FontWeight.Bold)
-                            Text("Read text copied on the PC, or send text from your phone to the PC clipboard.",color=Ink,fontSize=12.sp)
+                            Text("Sync text both ways. Copy an image in a phone app to send it to Windows, or copy a Windows screenshot with Snipping Tool and place it on your phone clipboard.",color=Ink,fontSize=12.sp)
                             OutlinedTextField(value=clipboardText,onValueChange={clipboardText=it},label={Text("Clipboard text")},modifier=Modifier.fillMaxWidth())
                             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                                 OutlinedButton(onClick={scope.launch {
@@ -310,6 +274,20 @@ private fun Z8Home() {
                                     } catch(e:Exception){status="Clipboard: "+e.message}
                                 }},enabled=token.isNotBlank(),colors=ButtonDefaults.buttonColors(containerColor=Forest,contentColor=Sand)){Text("COPY TO PC")}
                             }
+                            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(onClick={scope.launch {
+                                    try {
+                                        val result=withContext(Dispatchers.IO) { sendPhoneClipboardImage(context,address,token) }
+                                        status=result
+                                    } catch(e:Exception){status="Image clipboard: "+e.message}
+                                }},enabled=token.isNotBlank(),modifier=Modifier.weight(1f),contentPadding=PaddingValues(horizontal=4.dp,vertical=8.dp)){Text("SEND PHONE IMAGE TO PC",color=Forest,fontSize=11.sp)}
+                                OutlinedButton(onClick={scope.launch {
+                                    try {
+                                        val result=withContext(Dispatchers.IO) { copyPcClipboardImageToPhone(context,address,token) }
+                                        status=result
+                                    } catch(e:Exception){status="Image clipboard: "+e.message}
+                                }},enabled=token.isNotBlank(),modifier=Modifier.weight(1f),contentPadding=PaddingValues(horizontal=4.dp,vertical=8.dp)){Text("COPY PC IMAGE TO PHONE",color=Forest,fontSize=11.sp)}
+                            }
                         }
                     }
                 }
@@ -329,7 +307,9 @@ private fun Z8Home() {
                         Text("Connect your phone and PC to the same Wi-Fi, or use USB tethering. In the PC app, copy the current IP address and six-digit pairing code. Enter them on the Desktop page, tap CHECK PC / REFRESH PAIRING CODE, then tap PAIR AND CONNECT.", color=Ink)
                         Divider(color=Ice)
                         Text("4. Control your PC", color=Forest, fontWeight=FontWeight.SemiBold)
-                        Text("Tap the desktop to click, drag to move or drag items, swipe to scroll, long-press for right-click, use START for the Windows Start menu, and OPEN PC KEYBOARD to type directly into the active PC app. Rotate to landscape for the clean full-screen desktop view.", color=Ink)
+                        Text("Tap the desktop to click, drag to move or drag items, swipe vertically to scroll, long-press for right-click, use START for the Windows Start menu, and OPEN PC KEYBOARD to type directly into the active PC app. Rotate to landscape for the clean full-screen desktop view.", color=Ink)
+                        Text("5. Transfer files and screenshots", color=Forest, fontWeight=FontWeight.SemiBold)
+                        Text("Open Files, choose Downloads, Desktop or Documents, then choose a photo, video, song, document, APK or other file. In Desktop, the clipboard tools copy text and supported copied images between the phone and PC. On Windows, copy a screenshot with Snipping Tool before choosing COPY PC IMAGE TO PHONE.", color=Ink)
                         Text("Full PC screen on the phone in landscape", color=Forest, fontWeight=FontWeight.SemiBold)
                         Image(painterResource(R.drawable.tutorial_pc_screen),contentDescription="Z8 full-screen remote PC desktop",modifier=Modifier.fillMaxWidth().heightIn(max=220.dp),contentScale=ContentScale.Fit)
                         Text("Phone screen embedded inside the Windows app", color=Forest, fontWeight=FontWeight.SemiBold)
@@ -351,18 +331,7 @@ private fun Z8Home() {
                             if(uri!=null && token.isNotBlank()) scope.launch {
                                 try {
                                     val savedPath=withContext(Dispatchers.IO) {
-                                        val name=context.contentResolver.query(uri,arrayOf(OpenableColumns.DISPLAY_NAME),null,null,null)?.use { cursor ->
-                                            if(cursor.moveToFirst()) cursor.getString(0) else null
-                                        } ?: "received-file"
-                                        val url="http://"+address.trim()+":8765/files/upload?name="+URLEncoder.encode(name,"UTF-8")+"&destination="+URLEncoder.encode(destination,"UTF-8")
-                                        val c=URL(url).openConnection() as HttpURLConnection
-                                        c.requestMethod="POST";c.doOutput=true;c.connectTimeout=10000;c.readTimeout=60000
-                                        c.setRequestProperty("Authorization","Bearer "+token)
-                                        c.setRequestProperty("Content-Type",context.contentResolver.getType(uri) ?: "application/octet-stream")
-                                        context.contentResolver.openInputStream(uri)?.use{input->c.outputStream.use{output->input.copyTo(output)}}
-                                            ?: error("The selected file could not be opened")
-                                        if(c.responseCode !in 200..299) error("PC rejected file transfer ("+c.responseCode+")")
-                                        JSONObject(c.inputStream.bufferedReader().readText()).optString("path")
+                                        uploadFileToPc(context,uri,address,token,destination)
                                     }
                                     status="Saved on PC: "+savedPath
                                 }catch(e:Exception){status="File transfer failed: "+e.message}
@@ -375,6 +344,161 @@ private fun Z8Home() {
 
             }
         }
+    }
+}
+
+private fun sendPhoneClipboardImage(
+    context: android.content.Context,
+    address: String,
+    token: String
+): String {
+    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+    val uri = clipboard.primaryClip?.getItemAt(0)?.uri
+        ?: error("Copy an image in Photos or Files first, then try again.")
+    val mime = context.contentResolver.getType(uri) ?: "image/png"
+    if (!mime.startsWith("image/")) error("The phone clipboard does not contain an image.")
+    val connection = URL("http://" + address.trim() + ":8765/clipboard/image").openConnection() as HttpURLConnection
+    try {
+        connection.requestMethod = "POST"
+        connection.doOutput = true
+        connection.connectTimeout = 15000
+        connection.readTimeout = 60000
+        connection.setChunkedStreamingMode(64 * 1024)
+        connection.setRequestProperty("Authorization", "Bearer " + token)
+        connection.setRequestProperty("Content-Type", mime)
+        val source = context.contentResolver.openInputStream(uri) ?: error("Cannot open the copied phone image.")
+        source.use { input -> connection.outputStream.use { output -> input.copyTo(output, 64 * 1024) } }
+        if (connection.responseCode !in 200..299) error("PC rejected the image clipboard transfer (HTTP " + connection.responseCode + ").")
+        return "Phone image copied to the PC clipboard."
+    } finally { connection.disconnect() }
+}
+
+private fun copyPcClipboardImageToPhone(
+    context: android.content.Context,
+    address: String,
+    token: String
+): String {
+    if (android.os.Build.VERSION.SDK_INT < 29) error("Image clipboard sync requires Android 10 or newer.")
+    val connection = URL("http://" + address.trim() + ":8765/clipboard/image").openConnection() as HttpURLConnection
+    try {
+        connection.setRequestProperty("Authorization", "Bearer " + token)
+        connection.connectTimeout = 15000
+        connection.readTimeout = 60000
+        if (connection.responseCode !in 200..299) {
+            val message = connection.errorStream?.bufferedReader()?.use { it.readText() }.orEmpty()
+            error("PC image clipboard is unavailable: " + message.take(160))
+        }
+        val values = android.content.ContentValues().apply {
+            put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, "Z8-PC-Clipboard-" + System.currentTimeMillis() + ".png")
+            put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/png")
+            put(android.provider.MediaStore.Images.Media.RELATIVE_PATH, android.os.Environment.DIRECTORY_PICTURES + "/Z8 PC CONNECT")
+            put(android.provider.MediaStore.Images.Media.IS_PENDING, 1)
+        }
+        val resolver = context.contentResolver
+        val uri = resolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+            ?: error("Android could not create a clipboard image.")
+        try {
+            val output = resolver.openOutputStream(uri) ?: error("Android could not save the clipboard image.")
+            output.use { connection.inputStream.copyTo(it, 64 * 1024) }
+            val done = android.content.ContentValues().apply { put(android.provider.MediaStore.Images.Media.IS_PENDING, 0) }
+            resolver.update(uri, done, null, null)
+            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            clipboard.setPrimaryClip(android.content.ClipData.newUri(resolver, "Z8 PC image", uri))
+            return "PC image saved and copied to the phone clipboard."
+        } catch (e: Exception) {
+            resolver.delete(uri, null, null)
+            throw e
+        }
+    } finally { connection.disconnect() }
+}
+
+private fun Modifier.remoteDesktopControl(frame: Bitmap, send: (JSONObject) -> Unit): Modifier = pointerInput(frame) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        var last = down.position
+        var totalX = 0f
+        var totalY = 0f
+        var scrolling = false
+        var dragging = false
+        var rightClicked = false
+        fun moveTo(point: androidx.compose.ui.geometry.Offset) {
+            send(JSONObject().put("type", "move")
+                .put("x", (point.x / size.width * frame.width).toInt().coerceIn(0, frame.width - 1))
+                .put("y", (point.y / size.height * frame.height).toInt().coerceIn(0, frame.height - 1)))
+        }
+        var pending = withTimeoutOrNull(550L) { awaitPointerEvent() }
+        if (pending == null) {
+            send(JSONObject().put("type", "rightClick"))
+            rightClicked = true
+        }
+        while (true) {
+            val event = pending ?: awaitPointerEvent()
+            pending = null
+            val change = event.changes.firstOrNull() ?: break
+            if (!change.pressed) {
+                if (!rightClicked && !scrolling && !dragging) {
+                    moveTo(down.position)
+                    send(JSONObject().put("type", "click"))
+                }
+                if (dragging) send(JSONObject().put("type", "mouseUp"))
+                break
+            }
+            val delta = change.position - last
+            totalX += delta.x
+            totalY += delta.y
+            if (!rightClicked && !dragging && !scrolling &&
+                kotlin.math.abs(totalY) > 12f && kotlin.math.abs(totalY) > kotlin.math.abs(totalX) * 1.15f) {
+                scrolling = true
+            }
+            if (scrolling) {
+                val wheel = (-delta.y * 8f).toInt()
+                if (wheel != 0) send(JSONObject().put("type", "scroll").put("delta", wheel))
+            } else if (!rightClicked && totalX * totalX + totalY * totalY > 144f) {
+                if (!dragging) {
+                    moveTo(down.position)
+                    send(JSONObject().put("type", "mouseDown"))
+                    dragging = true
+                }
+                moveTo(change.position)
+            }
+            change.consume()
+            last = change.position
+        }
+    }
+}
+
+private fun uploadFileToPc(
+    context: android.content.Context,
+    uri: android.net.Uri,
+    address: String,
+    token: String,
+    destination: String
+): String {
+    val name = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+        if (cursor.moveToFirst()) cursor.getString(0) else null
+    } ?: "received-file"
+    val url = "http://" + address.trim() + ":8765/files/upload?name=" +
+        URLEncoder.encode(name, "UTF-8") + "&destination=" + URLEncoder.encode(destination, "UTF-8")
+    val connection = URL(url).openConnection() as HttpURLConnection
+    try {
+        connection.requestMethod = "POST"
+        connection.doOutput = true
+        connection.connectTimeout = 15000
+        connection.readTimeout = 120000
+        connection.setChunkedStreamingMode(64 * 1024)
+        connection.setRequestProperty("Authorization", "Bearer " + token)
+        connection.setRequestProperty("Content-Type", context.contentResolver.getType(uri) ?: "application/octet-stream")
+        val input = context.contentResolver.openInputStream(uri) ?: error("Android could not open the selected file")
+        input.use { source -> connection.outputStream.use { output -> source.copyTo(output, 64 * 1024) } }
+        val response = connection.responseCode
+        val body = (if (response in 200..299) connection.inputStream else connection.errorStream)
+            ?.bufferedReader()?.use { it.readText() }.orEmpty()
+        if (response !in 200..299) error("PC upload failed (HTTP " + response + "): " + body.take(240))
+        val result = JSONObject(body)
+        if (!result.optBoolean("saved", false)) error("PC did not confirm the file was saved")
+        return result.optString("path").ifBlank { result.optString("name", name) }
+    } finally {
+        connection.disconnect()
     }
 }
 
