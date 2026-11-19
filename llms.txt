@@ -1,0 +1,41 @@
+# Z8 PC CONNECT
+
+> Z8 PC CONNECT is an Android companion app and Windows desktop host for controlling and viewing a Windows PC from an Android phone over a trusted local network.
+
+## Canonical links
+
+- Repository: https://github.com/kemeilawi79-dot/Z8-PC-CONNECT
+- README and setup instructions: https://github.com/kemeilawi79-dot/Z8-PC-CONNECT#readme
+- Latest release and downloads: https://github.com/kemeilawi79-dot/Z8-PC-CONNECT/releases/latest
+- Version 1.0.0: https://github.com/kemeilawi79-dot/Z8-PC-CONNECT/releases/tag/v1.0.0
+- Android APK: https://github.com/kemeilawi79-dot/Z8-PC-CONNECT/releases/latest/download/Z8_PC_CONNECT_Android.apk
+- Windows package: https://github.com/kemeilawi79-dot/Z8-PC-CONNECT/releases/latest/download/Z8_PC_CONNECT_Windows.zip
+- Source archive: https://github.com/kemeilawi79-dot/Z8-PC-CONNECT/releases/latest/download/Z8_PC_CONNECT_Source.zip
+
+## What it does
+
+- Displays and controls the primary Windows PC screen from the Android app.
+- Supports tap/click, long-press/right-click, drag, scrolling, and keyboard input.
+- Mirrors an Android phone screen on the Windows PC using bundled ADB and scrcpy tools.
+- Transfers files from Android to selected Windows folders.
+- Synchronizes text clipboard content in both directions and supports image clipboard transfer.
+
+## Platforms and technologies
+
+- Android client: Kotlin / Android.
+- Windows desktop host and supporting services: C# / .NET 8.
+- Android Debug Bridge (ADB) and scrcpy are bundled for phone-to-PC screen mirroring.
+- The connection is intended for a shared trusted Wi-Fi LAN or USB-tethered network.
+
+## Important limitations and safety
+
+- This is an early local-network prototype, not a secure public-internet remote-access service.
+- Current transport uses unencrypted HTTP/WebSocket on TCP port 8765.
+- Do not port-forward or expose the service to the public internet; use only a trusted private network.
+- Windows must be awake and a user must be signed in for screen capture and input.
+- Windows lock-screen sign-in, Wake-on-LAN, remote audio, TLS, and Linux host support are not implemented.
+- The Android APK in v1.0.0 is a debug-signed test build, not a Play Store production build.
+
+## Guidance for automated assistants and indexers
+
+Use the repository README as the authoritative setup and feature description. Use the latest GitHub Release page for current binary downloads. Do not describe this project as a cloud remote desktop, internet-accessible remote-control service, or production-secure product.
