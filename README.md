@@ -10,7 +10,7 @@ Z8 PC CONNECT is a phone-to-Windows remote-control prototype for a trusted local
 5. Keep the host app open and Windows awake. The app does not register itself in Windows startup; closing it stops the local service.
 
 ## Android client
-Install `Z8_PC_CONNECT_Android.apk`. On the Desktop page, enter the PC IP address, tap **CHECK PC / REFRESH PAIRING CODE**, then tap **PAIR AND CONNECT**. Both devices must be on the same trusted Wi-Fi or tethered network.
+Install `Z8_PC_CONNECT_Android.apk` (the current package is a debug-signed test build; a production signing key is still needed before a Play Store release). On the Desktop page, enter the PC IP address, tap **CHECK PC / REFRESH PAIRING CODE**, then tap **PAIR AND CONNECT**. Both devices must be on the same trusted Wi-Fi or tethered network.
 
 ## PC control
 - The phone shows the entire primary PC display fitted to the available area. Rotate to landscape for a screen-only view.

@@ -318,7 +318,7 @@ private fun Z8Home() {
                     Z8Card {
                         Text("Z8 PC CONNECT · SETUP GUIDE", color=Forest, fontWeight=FontWeight.Bold)
                         Text("1. Install the phone app", color=Forest, fontWeight=FontWeight.SemiBold)
-                        Text("Install Z8 PC CONNECT on your Android phone. For public distribution, download the signed Android APK from the project's GitHub Releases page.", color=Ink)
+                        Text("Install Z8 PC CONNECT on your Android phone. For public distribution, download the Android APK from the project's GitHub Releases page.", color=Ink)
                         Image(painterResource(R.drawable.tutorial_phone_app),contentDescription="Z8 Android app home and PC pairing screen",modifier=Modifier.fillMaxWidth().heightIn(max=220.dp),contentScale=ContentScale.Fit)
                         Divider(color=Ice)
                         Text("2. Download the Windows app", color=Forest, fontWeight=FontWeight.SemiBold)
