@@ -15,21 +15,25 @@ app.UseWebSockets();
 var pairingCode = RandomNumberGenerator.GetInt32(100000, 999999).ToString();
 var tokens = new HashSet<string>(StringComparer.Ordinal);
 var gate = new object();
+var receivedFiles = new System.Collections.Concurrent.ConcurrentQueue<object>();
 Console.WriteLine("Z8_READY");
 Console.WriteLine($"PAIRING_CODE={pairingCode}");
 Console.WriteLine($"PC_NAME={Environment.MachineName}");
-foreach (var ip in Dns.GetHostEntry(Dns.GetHostName()).AddressList.Where(x => x.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork && !IPAddress.IsLoopback(x)))
-    Console.WriteLine($"PC_IP={ip}");
+foreach (var ip in GetIPv4Addresses()) Console.WriteLine($"PC_IP={ip}");
 Console.WriteLine("Z8 PC CONNECT server ready on TCP 8765.");
 
-app.MapGet("/health", () => Results.Json(new { app = "Z8 PC CONNECT", status = "ready", version = "0.3.0", transport = "LAN WebSocket" }));
+app.MapGet("/health", () => Results.Json(new { app = "Z8 PC CONNECT", status = "ready", version = "0.4.0", transport = "LAN WebSocket" }));
+app.MapGet("/status", () => Results.Json(new {
+    app = "Z8 PC CONNECT", status = "ready", pcName = Environment.MachineName,
+    pairingCode, port = 8765, addresses = GetIPv4Addresses()
+}));
 app.MapPost("/pair", (PairRequest req) => {
     lock (gate) {
-        if (req.Code != pairingCode) return Results.Unauthorized();
-        pairingCode = RandomNumberGenerator.GetInt32(100000, 999999).ToString();
-        Console.WriteLine($"PAIRING_CODE={pairingCode}");
+        if (string.IsNullOrWhiteSpace(req.Code) || !CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(req.Code.Trim()), Encoding.UTF8.GetBytes(pairingCode)))
+            return Results.Unauthorized();
         var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)).TrimEnd('=').Replace('+','-').Replace('/','_');
         tokens.Add(token);
+        Console.WriteLine($"PHONE_PAIRED at {DateTime.Now:T}");
         return Results.Json(new { token, pcName = Environment.MachineName, user = Environment.UserName });
     }
 });
@@ -49,44 +53,84 @@ app.MapPost("/clipboard", (ClipboardRequest body, HttpRequest req) => {
 app.MapPost("/files/upload", async (HttpRequest req) => {
     if (!Authorized(req, tokens, gate)) return Results.Unauthorized();
     var name = Path.GetFileName(req.Query["name"].ToString());
-    if (string.IsNullOrWhiteSpace(name)) return Results.BadRequest("Missing filename");
-    var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Z8 PC CONNECT Received");
+    if (string.IsNullOrWhiteSpace(name)) name = "received-file";
+    var destination = req.Query["destination"].ToString();
+    var folder = destination.ToLowerInvariant() switch {
+        "desktop" => Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+        "documents" => Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+        _ => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads")
+    };
     Directory.CreateDirectory(folder);
     var path = Path.Combine(folder, name);
-    await using var output = File.Create(path);
-    await req.Body.CopyToAsync(output);
-    return Results.Json(new { saved = true, path });
+    var stem = Path.GetFileNameWithoutExtension(name);
+    var ext = Path.GetExtension(name);
+    for (var n = 1; File.Exists(path); n++) path = Path.Combine(folder, $"{stem} ({n}){ext}");
+    await using (var output = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None)) {
+        await req.Body.CopyToAsync(output);
+    }
+    receivedFiles.Enqueue(new { name = Path.GetFileName(path), path, destination = Path.GetFileName(folder), receivedAt = DateTimeOffset.Now });
+    while (receivedFiles.Count > 30) receivedFiles.TryDequeue(out _);
+    Console.WriteLine($"FILE_RECEIVED={path}");
+    return Results.Json(new { saved = true, name = Path.GetFileName(path), path, destination = Path.GetFileName(folder) });
+});
+app.MapGet("/files/recent", (HttpContext ctx) => {
+    if (ctx.Connection.RemoteIpAddress is { } remote && !IPAddress.IsLoopback(remote.MapToIPv4())) return Results.Unauthorized();
+    return Results.Json(receivedFiles.ToArray());
 });
 app.Map("/remote", async (HttpContext ctx) => {
     var token = ctx.Request.Query["token"].ToString();
     lock (gate) { if (!tokens.Contains(token)) { ctx.Response.StatusCode = 401; return; } }
     if (!ctx.WebSockets.IsWebSocketRequest) { ctx.Response.StatusCode = 400; return; }
     using var socket = await ctx.WebSockets.AcceptWebSocketAsync();
+    Console.WriteLine("REMOTE_SCREEN_CONNECTED");
+    using var stop = CancellationTokenSource.CreateLinkedTokenSource(ctx.RequestAborted);
     var receiveTask = Task.Run(async () => {
         var buffer = new byte[16384];
-        while (socket.State == WebSocketState.Open && !ctx.RequestAborted.IsCancellationRequested) {
-            var result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), ctx.RequestAborted);
-            if (result.MessageType == WebSocketMessageType.Close) break;
+        while (socket.State == WebSocketState.Open && !stop.IsCancellationRequested) {
+            using var message = new MemoryStream();
+            WebSocketReceiveResult result;
+            do {
+                result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), stop.Token);
+                if (result.MessageType == WebSocketMessageType.Close) return;
+                if (result.MessageType == WebSocketMessageType.Text) message.Write(buffer, 0, result.Count);
+            } while (!result.EndOfMessage);
             if (result.MessageType == WebSocketMessageType.Text) {
-                try { HandleInput(JsonDocument.Parse(Encoding.UTF8.GetString(buffer, 0, result.Count)).RootElement); }
+                try { HandleInput(JsonDocument.Parse(message.ToArray()).RootElement); }
                 catch (Exception ex) { Console.WriteLine($"Input rejected: {ex.Message}"); }
             }
         }
-    }, ctx.RequestAborted);
-    while (socket.State == WebSocketState.Open && !ctx.RequestAborted.IsCancellationRequested) {
-        try {
+    }, stop.Token);
+    try {
+        while (socket.State == WebSocketState.Open && !stop.IsCancellationRequested) {
             using var bmp = CaptureScreen();
             using var ms = new MemoryStream();
-            bmp.Save(ms, ImageFormat.Jpeg);
-            await socket.SendAsync(new ArraySegment<byte>(ms.ToArray()), WebSocketMessageType.Binary, true, ctx.RequestAborted);
-        } catch (OperationCanceledException) { break; }
-          catch (Exception ex) { Console.WriteLine($"Capture: {ex.Message}"); }
-        await Task.Delay(100, ctx.RequestAborted);
-    }
-    try { await receiveTask; } catch { }
-    if (socket.State == WebSocketState.Open) await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closed", CancellationToken.None);
+            var encoder = ImageCodecInfo.GetImageEncoders().First(x => x.MimeType == "image/jpeg");
+            using var parameters = new EncoderParameters(1);
+            parameters.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, 72L);
+            bmp.Save(ms, encoder, parameters);
+            await socket.SendAsync(ms.ToArray(), WebSocketMessageType.Binary, true, stop.Token);
+            await Task.Delay(120, stop.Token);
+        }
+    } catch (OperationCanceledException) { }
+      catch (WebSocketException ex) { Console.WriteLine($"Phone disconnected: {ex.Message}"); }
+      finally {
+        stop.Cancel();
+        try { await receiveTask; } catch { }
+        if (socket.State == WebSocketState.Open) {
+            try { await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closed", CancellationToken.None); } catch { }
+        }
+        Console.WriteLine("REMOTE_SCREEN_DISCONNECTED");
+      }
 });
 app.Run();
+
+static string[] GetIPv4Addresses() =>
+    System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+        .Where(n => n.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up)
+        .SelectMany(n => n.GetIPProperties().UnicastAddresses)
+        .Where(a => a.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork &&
+                    !IPAddress.IsLoopback(a.Address) && !a.Address.ToString().StartsWith("169.254."))
+        .Select(a => a.Address.ToString()).Distinct().ToArray();
 
 static bool Authorized(HttpRequest req, HashSet<string> tokens, object gate) {
     var value = req.Headers.Authorization.ToString();
@@ -96,12 +140,15 @@ static bool Authorized(HttpRequest req, HashSet<string> tokens, object gate) {
 static Bitmap CaptureScreen() {
     var bounds = Screen.PrimaryScreen?.Bounds ?? new Rectangle(0,0,1280,720);
     var bmp = new Bitmap(Math.Max(1,bounds.Width), Math.Max(1,bounds.Height));
-    using var g = Graphics.FromImage(bmp); g.CopyFromScreen(bounds.Left,bounds.Top,0,0,bounds.Size);
+    using var g = Graphics.FromImage(bmp);
+    g.CopyFromScreen(bounds.Left,bounds.Top,0,0,bounds.Size);
     return bmp;
 }
 static void HandleInput(JsonElement e) {
     var type = e.TryGetProperty("type", out var t) ? t.GetString() : "";
     if (type == "move") Native.SetCursorPos(e.GetProperty("x").GetInt32(), e.GetProperty("y").GetInt32());
+    else if (type == "mouseDown") Native.mouse_event(2,0,0,0,UIntPtr.Zero);
+    else if (type == "mouseUp") Native.mouse_event(4,0,0,0,UIntPtr.Zero);
     else if (type == "click") { Native.mouse_event(2,0,0,0,UIntPtr.Zero); Native.mouse_event(4,0,0,0,UIntPtr.Zero); }
     else if (type == "rightClick") { Native.mouse_event(8,0,0,0,UIntPtr.Zero); Native.mouse_event(16,0,0,0,UIntPtr.Zero); }
     else if (type == "scroll") Native.mouse_event(0x0800,0,0,e.GetProperty("delta").GetInt32(),UIntPtr.Zero);
