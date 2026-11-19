@@ -61,8 +61,13 @@ app.MapPost("/clipboard/image", async (HttpRequest req) => {
     if (!Authorized(req, tokens, gate)) return Results.Unauthorized();
     if (req.ContentLength is > 25000000) return Results.BadRequest(new { error = "Clipboard image exceeds 25 MB." });
     using var buffer = new MemoryStream();
-    await req.Body.CopyToAsync(buffer);
-    if (buffer.Length < 8 || buffer.Length > 25000000) return Results.BadRequest(new { error = "Invalid or oversized image." });
+    var chunk = new byte[81920];
+    int read;
+    while ((read = await req.Body.ReadAsync(chunk, 0, chunk.Length)) > 0) {
+        if (buffer.Length + read > 25000000) return Results.BadRequest(new { error = "Clipboard image exceeds 25 MB." });
+        await buffer.WriteAsync(chunk, 0, read);
+    }
+    if (buffer.Length < 8) return Results.BadRequest(new { error = "Invalid image." });
     try { SetClipboardImage(buffer.ToArray()); return Results.Ok(new { saved = true, bytes = buffer.Length }); }
     catch { return Results.Problem("Could not write the PC image clipboard."); }
 });
